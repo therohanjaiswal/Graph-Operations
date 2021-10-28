@@ -5,6 +5,7 @@
 using namespace std;
 
 int timer = 1;
+int component = 0;
 
 class Graph
 {
@@ -12,8 +13,11 @@ private:
     vector<pair<int, int>> *adj = nullptr;
     int V;
     int e;
+
     int min_distance(int *, bool *);
     void traverse_dfs(bool *, int *, int *, string &, string &, int);
+    void scc_utils(int, int *, int *, stack<int> *, bool *, int *);
+    void print_scc(int *);
 
 public:
     Graph(int vertices)
@@ -21,12 +25,133 @@ public:
         V = vertices;
         adj = new vector<pair<int, int>>[V];
     }
-
     void add_edge(int, int, int);
     void print_graph();
     void dfs();
     void dijkstra(int);
+    void scc_tarjan();
 };
+
+void Graph::scc_utils(int u, int *disc, int *low, stack<int> *st, bool *stackMember, int *comp_arr)
+{
+    // Initialize discovery time and low value
+    *(disc + u) = *(low + u) = ++timer;
+    st->push(u);
+    *(stackMember + u) = true;
+
+    // Go through all vertices adjacent to this
+    for (auto it = adj[u].begin(); it != adj[u].end(); ++it)
+    {
+        int v = it->first; // v is current adjacent of 'u'
+
+        // If v is not visited yet, then recur for it
+        if (*(disc + v) == -1)
+        {
+            scc_utils(v, disc, low, st, stackMember, comp_arr);
+
+            // Check if the subtree rooted with 'v' has a
+            // connection to one of the ancestors of 'u'
+            // Case 1 (per above discussion on Disc and Low value)
+            *(low + u) = min(*(low + u), *(low + v));
+        }
+
+        // Update low value of 'u' only if 'v' is still in stack (i.e. it's a back edge, not cross edge).
+        else if (*(stackMember + v) == true)
+            *(low + u) = min(*(low + u), *(disc + v));
+    }
+
+    // head node found, pop the stack and print an SCC
+    int w = 0; // To store stack extracted vertices
+    if (*(low + u) == *(disc + u))
+    {
+        ++component;
+        while (st->top() != u)
+        {
+            w = (int)st->top();
+            // cout << w << " ";
+            *(comp_arr + w) = component;
+            *(stackMember + w) = false;
+            st->pop();
+        }
+        w = (int)st->top();
+        // cout << w << "\n";
+        *(comp_arr + w) = component;
+        *(stackMember + w) = false;
+        st->pop();
+    }
+}
+
+void Graph::scc_tarjan()
+{
+    int *disc = new int[V];
+    int *low = new int[V];
+    bool *stackMember = new bool[V];
+    stack<int> *st = new stack<int>();
+    timer = 0;
+    component = 0;
+    int *comp_arr = new int[V];
+    // Initialize disc and low, and stackMember arrays
+    for (int i = 0; i < V; i++)
+    {
+        *(disc + i) = -1;
+        *(low + i) = -1;
+        *(stackMember + i) = false;
+    }
+
+    // Call the recursive helper function to find strongly
+    // connected components in DFS tree with vertex 'i'
+    for (int i = 0; i < V; i++)
+        if (*(disc + i) == -1)
+            scc_utils(i, disc, low, st, stackMember, comp_arr);
+
+    print_scc(comp_arr);
+}
+
+void Graph::print_scc(int *comp_arr)
+{
+    for (int i = 0; i < V; i++)
+    {
+        *(comp_arr + i) %= 24;
+        cout << *(comp_arr + i) << " ";
+    }
+
+    ofstream stream;
+    string str = "scc.gv";
+    stream.open(str);
+    stream << "digraph g { \nranksep = \"equally\";\nrankdir = LR;\n";
+
+    string node_string = "";  // to store the details of every node
+    string edges_string = ""; // to store the pointers details
+    ostringstream oss1;
+    ostringstream oss2;
+
+    // string color[] = {"red", "blue", "green", "yellow", "orange", "pink", "cyan", "magenta", "brown", "gray", "black", "violet", "navyblue", "maroon", "aqua", "khaki", "crimson", "gold"};
+    string colors[] = {"red", "blue", "green", "yellow", "magenta", "aqua", "brown", "crimson", "coral", "darkgoldenrod", "darkgreen", "darkkhaki", "darkorange", "gold", "orange", "lightblue", "lightcoral", "salmon", "khaki", "maroon", "olive", "purple", "teal", "darkred"};
+    for (int i = 0; i < V; i++)
+    {
+        oss1 << i << "[color = \"" << colors[*(comp_arr + i)] << "\"];\n";
+        node_string.append(oss1.str());
+        oss1.str("");
+        oss1.clear();
+
+        for (auto it = adj[i].begin(); it != adj[i].end(); it++)
+        {
+            if (*(comp_arr + i) == *(comp_arr + it->first))
+                oss2 << i << "->" << it->first << "[label=\"" << it->second << "\"];\n";
+
+            else
+                oss2 << i << "->" << it->first << "[label=\"" << it->second << "\" color=\"gray\"];\n";
+            edges_string.append(oss2.str());
+            oss2.str("");
+            oss2.clear();
+        }
+    }
+
+    stream << node_string;
+    stream << edges_string;
+    stream << "}";
+    stream.close();
+}
 
 // The main function that calculates distances of shortest paths from src to all
 // vertices. It is a O(ELogV) function
@@ -276,6 +401,7 @@ int main()
     Graph *graph = makeGraph();
     // graph->print_graph();
     // graph->dfs();
-    graph->dijkstra(0);
+    // graph->dijkstra(0);
+    graph->scc_tarjan();
     return 0;
 }
