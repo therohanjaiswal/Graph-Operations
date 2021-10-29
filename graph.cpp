@@ -10,14 +10,14 @@ int component = 0;
 class CompGraph
 {
 private:
-    vector<pair<int, int>> *adj = nullptr;
+    vector<int> *adj = nullptr;
     int V;
 
 public:
     CompGraph(int vertices)
     {
         V = vertices;
-        adj = new vector<pair<int, int>>[V];
+        adj = new vector<int>[V];
     }
     void add_comp_edge(int, int);
     void print_comp_graph();
@@ -53,9 +53,8 @@ public:
 
 void CompGraph::print_comp_graph()
 {
-
     ofstream stream;
-    string str = "comp_graph.gv";
+    string str = "comp_dag.gv";
     stream.open(str);
     stream << "digraph g { \nranksep = \"equally\";\nrankdir = LR;\n";
 
@@ -70,7 +69,7 @@ void CompGraph::print_comp_graph()
         node_string.append(oss1.str());
         for (auto it = adj[i].begin(); it != adj[i].end(); it++)
         {
-            oss2 << i << "->" << it->first << "[label=\"" << it->second << "\"];\n";
+            oss2 << i << "->" << *it << ";\n";
             edges_string.append(oss2.str());
             oss2.str("");
             oss2.clear();
@@ -84,13 +83,13 @@ void CompGraph::print_comp_graph()
     stream << "}";
     stream.close();
 
-    string cmd = "dot -Tpng comp_graph.gv -o comp_graph.png";
+    string cmd = "dot -Tpng comp_dag.gv -o comp_dag.png";
     system((const char *)cmd.c_str());
 }
 
 void CompGraph::add_comp_edge(int u, int v)
 {
-    adj[u].push_back(make_pair(v, 0));
+    adj[u].push_back(v);
 }
 
 // A recursive function used by topologicalSort
@@ -101,8 +100,8 @@ void CompGraph::topological_sort_util(int v, bool *visited, stack<int> &my_stack
 
     // Recur for all the vertices adjacent to this vertex
     for (auto it = adj[v].begin(); it != adj[v].end(); ++it)
-        if (!*(visited + it->first))
-            topological_sort_util(it->first, visited, my_stack);
+        if (!*(visited + *it))
+            topological_sort_util(*it, visited, my_stack);
 
     // Push current vertex to stack which stores result
     my_stack.push(v);
@@ -134,11 +133,11 @@ bool CompGraph::topological_sort()
 
     for (int i = 0; i < component - 1; ++i)
     {
-        vector<pair<int, int>> u = *(adj + *(temp + i));
+        vector<int> u = *(adj + *(temp + i));
         bool has_edge = false;
         for (auto it = u.begin(); it != u.end(); ++it)
         {
-            if (it->first == *(temp + i + 1))
+            if (*it == *(temp + i + 1))
             {
                 has_edge = true;
                 break;
@@ -530,7 +529,7 @@ int main()
 {
     Graph *graph = makeGraph();
     // graph->print_graph();
-    graph->dfs();
+    // graph->dfs();
     // graph->dijkstra(0);
     // graph->scc_tarjan();
     cout << graph->is_semiconnected();
