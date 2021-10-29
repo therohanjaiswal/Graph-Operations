@@ -7,6 +7,24 @@ using namespace std;
 int timer = 1;
 int component = 0;
 
+class CompGraph
+{
+private:
+    vector<pair<int, int>> *adj = nullptr;
+    int V;
+
+public:
+    CompGraph(int vertices)
+    {
+        V = vertices;
+        adj = new vector<pair<int, int>>[V];
+    }
+    void add_comp_edge(int, int);
+    void print_comp_graph();
+    bool topological_sort();
+    void topological_sort_util(int, bool *, stack<int> &);
+};
+
 class Graph
 {
 private:
@@ -29,8 +47,123 @@ public:
     void print_graph();
     void dfs();
     void dijkstra(int);
-    void scc_tarjan();
+    int *scc_tarjan();
+    bool is_semiconnected();
 };
+
+void CompGraph::print_comp_graph()
+{
+
+    ofstream stream;
+    string str = "comp_graph.gv";
+    stream.open(str);
+    stream << "digraph g { \nranksep = \"equally\";\nrankdir = LR;\n";
+
+    string node_string = "";  // to store the details of every node
+    string edges_string = ""; // to store the pointers details
+    ostringstream oss1;
+    ostringstream oss2;
+
+    for (int i = 0; i < V; i++)
+    {
+        oss1 << i << "[color = \"blue\"];\n";
+        node_string.append(oss1.str());
+        for (auto it = adj[i].begin(); it != adj[i].end(); it++)
+        {
+            oss2 << i << "->" << it->first << "[label=\"" << it->second << "\"];\n";
+            edges_string.append(oss2.str());
+            oss2.str("");
+            oss2.clear();
+        }
+        oss1.str("");
+        oss1.clear();
+    }
+
+    stream << node_string;
+    stream << edges_string;
+    stream << "}";
+    stream.close();
+
+    string cmd = "dot -Tpng comp_graph.gv -o comp_graph.png";
+    system((const char *)cmd.c_str());
+}
+
+void CompGraph::add_comp_edge(int u, int v)
+{
+    adj[u].push_back(make_pair(v, 0));
+}
+
+// A recursive function used by topologicalSort
+void CompGraph::topological_sort_util(int v, bool *visited, stack<int> &my_stack)
+{
+    // Mark the current node as visited.
+    visited[v] = true;
+
+    // Recur for all the vertices adjacent to this vertex
+    for (auto it = adj[v].begin(); it != adj[v].end(); ++it)
+        if (!*(visited + it->first))
+            topological_sort_util(it->first, visited, my_stack);
+
+    // Push current vertex to stack which stores result
+    my_stack.push(v);
+}
+
+// The function to do Topological Sort. It uses recursive topologicalSortUtil()
+bool CompGraph::topological_sort()
+{
+    stack<int> my_stack;
+    int *temp = new int[component];
+    // Mark all the vertices as not visited
+    bool *visited = new bool[V];
+    for (int i = 0; i < V; i++)
+        visited[i] = false;
+
+    // Call the recursive helper function to store Topological
+    // Sort starting from all vertices one by one
+    for (int i = 0; i < V; i++)
+        if (visited[i] == false)
+            topological_sort_util(i, visited, my_stack);
+
+    // Print contents of stack
+    int i = 0;
+    while (my_stack.empty() == false)
+    {
+        *(temp + i++) = my_stack.top();
+        my_stack.pop();
+    }
+
+    for (int i = 0; i < component - 1; ++i)
+    {
+        vector<pair<int, int>> u = *(adj + *(temp + i));
+        bool has_edge = false;
+        for (auto it = u.begin(); it != u.end(); ++it)
+        {
+            if (it->first == *(temp + i + 1))
+            {
+                has_edge = true;
+                break;
+            }
+        }
+
+        if (!has_edge)
+            return false;
+    }
+    return true;
+}
+
+bool Graph::is_semiconnected()
+{
+    int *comp = scc_tarjan();
+    CompGraph *comp_graph = new CompGraph(component);
+
+    for (int i = 0; i < V; ++i)
+        for (auto it = adj[i].begin(); it != adj[i].end(); ++it)
+            if (*(comp + i) != *(comp + it->first))
+                comp_graph->add_comp_edge(*(comp + i) - 1, *(comp + it->first) - 1);
+
+    comp_graph->print_comp_graph();
+    return comp_graph->topological_sort();
+}
 
 void Graph::scc_utils(int u, int *disc, int *low, stack<int> *st, bool *stackMember, int *comp_arr)
 {
@@ -81,7 +214,7 @@ void Graph::scc_utils(int u, int *disc, int *low, stack<int> *st, bool *stackMem
     }
 }
 
-void Graph::scc_tarjan()
+int *Graph::scc_tarjan()
 {
     int *disc = new int[V];
     int *low = new int[V];
@@ -104,16 +237,14 @@ void Graph::scc_tarjan()
         if (*(disc + i) == -1)
             scc_utils(i, disc, low, st, stackMember, comp_arr);
 
-    print_scc(comp_arr);
+    // print_scc(comp_arr);
+    return comp_arr;
 }
 
 void Graph::print_scc(int *comp_arr)
 {
     for (int i = 0; i < V; i++)
-    {
         *(comp_arr + i) %= 24;
-        cout << *(comp_arr + i) << " ";
-    }
 
     ofstream stream;
     string str = "scc.gv";
@@ -151,6 +282,9 @@ void Graph::print_scc(int *comp_arr)
     stream << edges_string;
     stream << "}";
     stream.close();
+
+    string cmd = "dot -Tpng scc.gv -o scc.png";
+    system((const char *)cmd.c_str());
 }
 
 // The main function that calculates distances of shortest paths from src to all
@@ -240,6 +374,9 @@ void Graph::dfs()
     stream << edge_string;
     stream << "}";
     stream.close();
+
+    string cmd = "dot -Tpng dfs.gv -o dfs.png";
+    system((const char *)cmd.c_str());
 }
 
 void Graph::traverse_dfs(bool *visited, int *start, int *end, string &edge_str, string &node_str, int i)
@@ -262,26 +399,18 @@ void Graph::traverse_dfs(bool *visited, int *start, int *end, string &edge_str, 
         }
         else
         {
-            if (*(end + it->first) == 0)
-            {
-                // back
+            if (*(end + it->first) == 0) // back
                 oss << i << "->" << it->first << "[label=\" " << it->second << "\" color=\"green\"];\n";
-                edge_str.append(oss.str());
-            }
-            else if (*(start + i) < *(start + it->first))
-            { // forward
+            else if (*(start + i) < *(start + it->first)) // forward
                 oss << i << "->" << it->first << "[label=\" " << it->second << "\" color=\"red\"];\n";
-                edge_str.append(oss.str());
-            }
-            else
-            { // cross
+            else // cross
                 oss << i << "->" << it->first << "[label=\" " << it->second << "\" color=\"blue\"];\n";
-                edge_str.append(oss.str());
-            }
+            edge_str.append(oss.str());
             oss.str("");
             oss.clear();
         }
     }
+
     *(end + i) = timer++;
     oss1 << *(end + i) << ")\"];\n";
     node_str.append(oss1.str());
@@ -353,12 +482,12 @@ void Graph::print_graph()
                     else
                     {
                         if (*(exp_time + s) == *(exp_time + it->first))
-                        {
+                        { // back
                             oss << s << "->" << it->first << "[label=\"" << it->second << "\" color=\"green\"];\n";
                             edges_string.append(oss.str());
                         }
                         else if (*(exp_time + s) > *(exp_time + it->first))
-                        {
+                        { // forward
                             oss << s << "->" << it->first << "[label=\"" << it->second << "\" color=\"red\"];\n";
                             edges_string.append(oss.str());
                         }
@@ -373,9 +502,10 @@ void Graph::print_graph()
     stream << edges_string;
     stream << "}";
     stream.close();
+
     // generate tree image
-    // string cmd = "dot -Tpng graph.gv -o " + string(filename) + ".png";
-    // system((const char *)cmd.c_str());
+    string cmd = "dot -Tpng graph.gv -o graph.png";
+    system((const char *)cmd.c_str());
 }
 
 Graph *makeGraph()
@@ -400,8 +530,9 @@ int main()
 {
     Graph *graph = makeGraph();
     // graph->print_graph();
-    // graph->dfs();
+    graph->dfs();
     // graph->dijkstra(0);
-    graph->scc_tarjan();
+    // graph->scc_tarjan();
+    cout << graph->is_semiconnected();
     return 0;
 }
